@@ -1,49 +1,91 @@
-variable "first_name" {
-  type        = string
-  description = "Please enter your first name. This will be used in several components."
+variable "proxmox_api_url" {
+  type = string
 }
 
-variable "atcomputing_user" {
-  type        = string
-  description = "The user created on the EC2 instance."
-  default     = "atcomputing"
+variable "proxmox_api_token_id" {
+  type = string
 }
 
-variable "public_key" {
+variable "proxmox_api_token_secret" {
+  type = string
+}
+
+variable "proxmox_ssh_user" {
+  type = string
+}
+
+variable "proxmox_ssh_private_key" {
+  type = string
+}
+
+variable "pm_tls_insecure" {
   type    = string
-  default = "~/.ssh/id_rsa.pub"
+  default = false
 }
 
-variable "private_key" {
-  type    = string
-  default = "~/.ssh/id_rsa"
+variable "pm_debug" {
+  type    = bool
+  default = true
 }
 
-variable "instance_type" {
-  type    = string
-  default = "t2.micro"
+variable "servervms" {
+  type = map(
+    object(
+      {
+        index          = number
+        name           = string
+        target_node    = string
+        target_pool    = string
+        clone_target   = string
+        desc           = string
+        os_type        = string
+        qemu_os        = string
+        ipconfig       = string
+        memory         = number
+        memory_min     = number
+        onboot         = bool
+        cloud_drive    = string
+        agent          = number
+        disk_create    = bool
+        disk_datastore = string
+        disk_size      = string
+        disk_type      = string
+        disk_format    = string
+        disk_ssd       = number
+        cores          = number
+        network_bridge = string
+      }
+    )
+  )
 }
 
-variable "server_count" {
-  type    = number
-  default = 3
-}
-
-variable "server_name_prefix" {
-  type    = string
-  default = "server"
-}
-
-variable "client_count" {
-  type    = number
-  default = 4
-}
-
-variable "client_name_prefix" {
-  type    = string
-  default = "client"
-}
-
-locals {
-  instance_ami = data.aws_ami.ubuntu.id
+variable "clientvms" {
+  type = map(
+    object(
+      {
+        index          = number
+        name           = string
+        target_node    = string
+        target_pool    = string
+        clone_target   = string
+        desc           = string
+        os_type        = string
+        qemu_os        = string
+        ipconfig       = string
+        memory         = number
+        memory_min     = number
+        onboot         = bool
+        agent          = number
+        cloud_drive    = string
+        disk_create    = bool
+        disk_datastore = string
+        disk_size      = string
+        disk_type      = string
+        disk_format    = string
+        disk_ssd       = number
+        cores          = number
+        network_bridge = string
+      }
+    )
+  )
 }
