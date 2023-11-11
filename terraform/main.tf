@@ -1,89 +1,151 @@
-resource "aws_key_pair" "key" {
-  key_name   = "${var.first_name}-hashi-key"
-  public_key = file(var.public_key)
-}
+# Proxmox Full-Clone
+# ---
+# Create a new VM from a clone
 
-resource "aws_instance" "servers" {
-  ami           = local.instance_ami
-  instance_type = var.instance_type
-  key_name      = aws_key_pair.key.key_name
-  count         = var.server_count
+resource "proxmox_vm_qemu" "servers" {
+  for_each = var.servervms
+  # VM General Settings
+  target_node = each.value.target_node
+  name        = "${each.value.name}0${each.value.index}"
+  desc        = each.value.desc
+  pool        = each.value.target_pool
+  # VM Advanced General Settings
+  onboot           = each.value.onboot
+  full_clone       = false
+  automatic_reboot = true
+  qemu_os          = "l26"
+  #bootdisk         = "scsi0"
+  #preprovision = false
+  cloudinit_cdrom_storage = each.value.cloud_drive
 
-  tags = {
-    Name = "${var.first_name}-${var.server_name_prefix}${format("%02d", count.index + 1)}"
+  # force_create = true
+  additional_wait = 10
+  # VM OS Settings
+  clone   = each.value.clone_target
+  bios    = "ovmf"
+  os_type = each.value.os_type
+  # VM System Settings
+  agent = each.value.agent
+
+  # VM CPU Settings
+  cores   = each.value.cores
+  sockets = 1
+  cpu     = "host"
+
+  # VM Memory Settings
+  memory  = each.value.memory
+  balloon = each.value.memory_min
+
+  # VM Network Settings
+  network {
+    bridge = each.value.network_bridge
+    model  = "virtio"
   }
 
-  provisioner "remote-exec" {
-    inline = [
-      "sudo adduser --disabled-password --gecos '' ${var.atcomputing_user}",
-      "sudo mkdir -p /home/${var.atcomputing_user}/.ssh",
-      "sudo touch /home/${var.atcomputing_user}/.ssh/authorized_keys",
-      "sudo echo '${file(var.public_key)}' > authorized_keys",
-      "sudo mv authorized_keys /home/${var.atcomputing_user}/.ssh",
-      "sudo chown -R ${var.atcomputing_user}:${var.atcomputing_user} /home/${var.atcomputing_user}/.ssh",
-      "sudo chmod 700 /home/${var.atcomputing_user}/.ssh",
-      "sudo chmod 600 /home/${var.atcomputing_user}/.ssh/authorized_keys",
-      "sudo usermod -aG sudo ${var.atcomputing_user}",
-      "sudo echo '${var.atcomputing_user} ALL=(ALL) NOPASSWD:ALL' | sudo tee -a /etc/sudoers.d/90-cloud-init-users",
-      "sudo hostnamectl set-hostname ${self.tags.Name}"
-    ]
+  # VM Disk
+  scsihw = "virtio-scsi-pci"
 
-    connection {
-      type        = "ssh"
-      host        = self.public_ip
-      user        = "ubuntu"
-      private_key = file(var.private_key)
+  dynamic "disk" {
+    for_each = each.value.disk_create ? [1] : []
+    content {
+      size    = each.value.disk_size
+      storage = each.value.disk_datastore
+      type    = each.value.disk_type
+      format  = each.value.disk_format
+      ssd     = each.value.disk_ssd
+    }
+  }
+  
+  # VM Cloud-Init Settings
+  ipconfig0 = each.value.ipconfig
+
+  # Life cycle ignores
+  lifecycle {
+    ignore_changes = [
+      network
+    ]
+  }
+
+}
+
+resource "proxmox_vm_qemu" "clients" {
+  for_each = var.clientvms
+  # VM General Settings
+  target_node = each.value.target_node
+  name        = "${each.value.name}0${each.value.index}"
+  desc        = each.value.desc
+  pool        = each.value.target_pool
+  # VM Advanced General Settings
+  onboot           = each.value.onboot
+  full_clone       = false
+  automatic_reboot = true
+  qemu_os          = "l26"
+  #bootdisk         = "scsi0"
+  #preprovision = false
+  cloudinit_cdrom_storage = each.value.cloud_drive
+
+  # force_create = true
+  additional_wait = 10
+  # VM OS Settings
+  clone   = each.value.clone_target
+  bios    = "ovmf"
+  os_type = each.value.os_type
+  # VM System Settings
+  agent = each.value.agent
+
+  # VM CPU Settings
+  cores   = each.value.cores
+  sockets = 1
+  cpu     = "host"
+
+  # VM Memory Settings
+  memory  = each.value.memory
+  balloon = each.value.memory_min
+
+  # VM Network Settings
+  network {
+    bridge = each.value.network_bridge
+    model  = "virtio"
+  }
+
+  # VM Disk
+  scsihw = "virtio-scsi-pci"
+
+  dynamic "disk" {
+    for_each = each.value.disk_create ? [1] : []
+    content {
+      size    = each.value.disk_size
+      storage = each.value.disk_datastore
+      type    = each.value.disk_type
+      format  = each.value.disk_format
+      ssd     = each.value.disk_ssd
     }
   }
 
-}
+  # VM Cloud-Init Settings
+  ipconfig0 = each.value.ipconfig
 
-resource "aws_instance" "clients" {
-  ami           = local.instance_ami
-  instance_type = var.instance_type
-  key_name      = aws_key_pair.key.key_name
-  count         = var.client_count
-
-  tags = {
-    Name = "${var.first_name}-${var.client_name_prefix}${format("%02d", count.index + 1)}"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo adduser --disabled-password --gecos '' ${var.atcomputing_user}",
-      "sudo mkdir -p /home/${var.atcomputing_user}/.ssh",
-      "sudo touch /home/${var.atcomputing_user}/.ssh/authorized_keys",
-      "sudo echo '${file(var.public_key)}' > authorized_keys",
-      "sudo mv authorized_keys /home/${var.atcomputing_user}/.ssh",
-      "sudo chown -R ${var.atcomputing_user}:${var.atcomputing_user} /home/${var.atcomputing_user}/.ssh",
-      "sudo chmod 700 /home/${var.atcomputing_user}/.ssh",
-      "sudo chmod 600 /home/${var.atcomputing_user}/.ssh/authorized_keys",
-      "sudo usermod -aG sudo ${var.atcomputing_user}",
-      "sudo echo '${var.atcomputing_user} ALL=(ALL) NOPASSWD:ALL' | sudo tee -a /etc/sudoers.d/90-cloud-init-users",
-      "sudo hostnamectl set-hostname ${self.tags.Name}"
+  # Life cycle ignores
+  lifecycle {
+    ignore_changes = [
+      network
     ]
-
-    connection {
-      type        = "ssh"
-      host        = self.public_ip
-      user        = "ubuntu"
-      private_key = file(var.private_key)
-    }
   }
 
 }
+
 resource "local_file" "ansible_inventory" {
   content = templatefile("inventory.tmpl",
     {
       servers = tomap({
-        for instance in aws_instance.servers :
-        instance.tags.Name => instance.public_ip
+        for instance in proxmox_vm_qemu.servers :
+        instance.name => instance.default_ipv4_address
       })
       clients = tomap({
-        for instance in aws_instance.clients :
-        instance.tags.Name => instance.public_ip
+        for instance in proxmox_vm_qemu.clients :
+        instance.name => instance.default_ipv4_address
       })
     }
   )
-  filename = "../inventory"
+  filename = "${path.module}/inventory"
 }
