@@ -17,6 +17,6 @@ basic_apt_packages:
   - unattended-upgrades
   - vim
 
-timezone: "Europe/Amsterdam"
+timezone: "America/New_York"
 
 demo_fqdn: "demo.atcomputing.local"
